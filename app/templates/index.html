@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HasMyIdeaBeenTaken</title>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --card: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --border: #dbe3f0;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(180deg, #eef4ff 0%, var(--bg) 100%);
+            color: var(--text);
+        }
+
+        .shell {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .hero {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 28px;
+            box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+        }
+
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 2.2rem;
+        }
+
+        .hero p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 1rem;
+        }
+
+        .search-bar {
+            margin-top: 24px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        input,
+        button {
+            font-size: 1rem;
+            border-radius: 10px;
+        }
+
+        input {
+            flex: 1 1 420px;
+            padding: 14px 16px;
+            border: 1px solid var(--border);
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        button {
+            padding: 14px 20px;
+            border: none;
+            cursor: pointer;
+            background: var(--primary);
+            color: white;
+            font-weight: 700;
+            transition: background 0.2s ease;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+        }
+
+        .status {
+            margin-top: 18px;
+            color: var(--muted);
+            min-height: 24px;
+        }
+
+        .results {
+            margin-top: 28px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: #e9effd;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 14px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-size: 0.9rem;
+            color: #244381;
+        }
+
+        td {
+            color: #334155;
+            font-size: 0.95rem;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .empty {
+            color: var(--muted);
+            padding: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="hero">
+            <h1>HasMyIdeaBeenTaken</h1>
+            <p>Describe your idea and compare it against a curated repository index.</p>
+
+            <form id="search-form" class="search-bar">
+                <input id="query" type="text" placeholder="Describe your project idea..." value="hello-world" />
+                <button type="submit">Search</button>
+            </form>
+
+            <div id="status" class="status">Ready to search.</div>
+
+            <div id="results" class="results"></div>
+        </section>
+    </div>
+
+    <script>
+        const form = document.getElementById('search-form');
+        const queryInput = document.getElementById('query');
+        const status = document.getElementById('status');
+        const results = document.getElementById('results');
+
+        async function searchIdeas(query) {
+            status.textContent = 'Searching...';
+            results.innerHTML = '';
+
+            const response = await fetch('/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok) {
+                status.textContent = payload.detail || 'No matches found.';
+                results.innerHTML = '<div class="empty">Try a different description or seed the demo repository first.</div>';
+                return;
+            }
+
+            const matches = payload.matches || [];
+            if (!matches.length) {
+                status.textContent = 'No matching repositories were found.';
+                results.innerHTML = '<div class="empty">No results available for this query.</div>';
+                return;
+            }
+
+            status.textContent = `Found ${matches.length} similar result(s).`;
+            results.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Repository</th>
+                            <th>Owner</th>
+                            <th>Similarity</th>
+                            <th>Summary</th>
+                            <th>Link</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${matches.map((match) => `
+                            <tr>
+                                <td>${match.repository_name}</td>
+                                <td>${match.owner_username}</td>
+                                <td>${match.score}</td>
+                                <td>${match.summary || 'No summary available'}</td>
+                                <td><a href="${match.url}" target="_blank" rel="noreferrer">Open</a></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const query = queryInput.value.trim();
+            if (!query) {
+                status.textContent = 'Please enter a project idea first.';
+                return;
+            }
+
+            await searchIdeas(query);
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            searchIdeas(queryInput.value.trim());
+        });
+    </script>
+</body>
+</html>
